@@ -28,7 +28,7 @@ func TestTTLFail(t *testing.T) {
 	}()
 
 	func() {
-		ttl := NewTTL()
+		ttl := NewTTL(true)
 		defer func() {
 			if r := recover(); r != nil {
 				t.Log("recovered", r)
@@ -37,11 +37,21 @@ func TestTTLFail(t *testing.T) {
 		ttl.AddItem("1", time.Nanosecond)
 	}()
 
+	func() {
+		ttl := NewTTL(false)
+		defer func() {
+			if r := recover(); r != nil {
+				t.Log("recovered", r)
+			}
+		}()
+		ttl.Expired()
+	}()
+
 }
 
 func TestTTL(t *testing.T) {
 
-	ttl := NewTTL()
+	ttl := NewTTL(true)
 	ttl.AddItem("1", 2*time.Second)
 	t1 := time.Now()
 	ttl.AddItem("2", 3*time.Second)
@@ -54,6 +64,8 @@ func TestTTL(t *testing.T) {
 	if !ttl.CheckItem("2") {
 		t.Fatalf("Item \"1\" should be in ttl")
 	}
+
+	ttl.GetItems()
 
 	time.Sleep(time.Second)
 	ttl.AddItem("1", 5*time.Second)

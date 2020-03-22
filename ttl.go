@@ -13,11 +13,27 @@ type TTL struct {
 	expired  chan interface{}
 }
 
+// GetItems returns all non-expired items
+func (ttl *TTL) GetItems() []interface{} {
+	ttl.itemsMtx.RLock()
+	defer ttl.itemsMtx.RUnlock()
+	s := make([]interface{}, 0, len(ttl.items))
+	for item := range ttl.items {
+		s = append(s, item)
+	}
+	return s
+}
+
 // Expired channel delivers items that expires
 func (ttl *TTL) Expired() <-chan interface{} {
-	if ttl.expired == nil {
+
+	if ttl.items == nil {
 		panic("ttl not instantiated")
 	}
+	if ttl.expired == nil {
+		panic("ttl was set to not deliver expired items")
+	}
+
 	return ttl.expired
 }
 
@@ -46,7 +62,9 @@ func (ttl *TTL) AddItem(item interface{}, expireIn time.Duration) {
 			ttl.items[item].Stop()
 			delete(ttl.items, item)
 			ttl.itemsMtx.Unlock()
-			ttl.expired <- item
+			if ttl.expired != nil {
+				ttl.expired <- item
+			}
 		})
 	}
 
@@ -60,11 +78,14 @@ func (ttl *TTL) CheckItem(item interface{}) bool {
 	return exist
 }
 
-// NewTTL instantiates the ttl map
-func NewTTL() *TTL {
+// NewTTL instantiates the ttl. deliverExpired chooses whether to deliver expired items on ttl.Expired() channel. If set to false, calling ttl.Expired() will panic.
+func NewTTL(deliverExpired bool) *TTL {
 	ttl := TTL{
 		items:   make(map[interface{}]*time.Timer),
-		expired: make(chan interface{}),
+		expired: nil,
+	}
+	if deliverExpired {
+		ttl.expired = make(chan interface{})
 	}
 	return &ttl
 }
